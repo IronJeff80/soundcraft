@@ -626,6 +626,8 @@ impl Session {
             }
             for l in &mut t.automation {
                 l.points.retain(|p| p.value.is_finite());
+                let (lo, hi, _) = l.param.range();
+                l.points.iter_mut().for_each(|p| p.value = p.value.clamp(lo, hi));
                 l.points.iter_mut().for_each(|p| bound(&mut p.at));
                 l.points.sort_by_key(|p| p.at);
             }

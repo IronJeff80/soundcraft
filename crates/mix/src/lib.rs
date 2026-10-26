@@ -76,6 +76,11 @@ pub fn main_channels(s: &Session) -> usize {
 /// (insert slots use their index).
 pub const INSTRUMENT_SLOT: usize = usize::MAX;
 
+/// Top of the clip effects gain slider; a stored or wired gain is clamped to it (#884).
+pub const CLIP_FX_MAX_GAIN_DB: f32 = 24.0;
+/// Top of a send fader, the same +12 dB `AutoParam::SendLevel` ranges up to (#884).
+pub const SEND_LEVEL_MAX_DB: f32 = 12.0;
+
 /// Hosted third-party plugin ids (CLAP or VST3): created off the audio thread in realtime use.
 pub fn is_third_party(id: &str) -> bool {
     id.starts_with(soundcraft_clap_host::ID_PREFIX)
@@ -1279,7 +1284,7 @@ impl ClipFx {
                     c.set_param(p, v);
                 }
             } else if k == "gain" {
-                self.gain_db = v;
+                self.gain_db = if v.is_nan() { 0.0 } else { v.clamp(soundcraft_dsp::MIN_DB, CLIP_FX_MAX_GAIN_DB) };
             }
         }
     }
@@ -1967,7 +1972,7 @@ fn send_level(t: &Track, i: usize, base: f32, pos: Samples) -> f32 {
         && let Some(l) = t.lane(&AutoParam::SendLevel(u8::try_from(i).unwrap_or(0)))
         && !l.points.is_empty()
     {
-        return l.value_at(pos, base);
+        return l.value_at(pos, base).clamp(soundcraft_dsp::MIN_DB, SEND_LEVEL_MAX_DB);
     }
     base
 }
