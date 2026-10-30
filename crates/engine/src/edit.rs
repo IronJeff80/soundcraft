@@ -177,28 +177,21 @@ pub fn clear_range(s: &mut Session, track: TrackId, range: Range, shuffle: bool)
     removed
 }
 
-/// Remove the clips `ids` from every track. In Shuffle the later clips on each track close the gaps they leave,
-/// the latest gap first so the earlier ones stay where they were. Returns how many clips went.
+/// Remove the clips `ids` from every track. In Shuffle the later clips on each track close the holes the movable
+/// ones leave, as a Shuffle move lifts them (see [`lift_plan`]), so a crossfade partner keeps its material. Returns
+/// how many clips went.
 pub fn remove_clips(s: &mut Session, ids: &[ClipId], shuffle: bool) -> usize {
-    let mut gaps: Vec<(TrackId, Range)> = Vec::new();
-    for t in &mut s.tracks {
-        let track = t.id;
-        if let Some(pl) = t.playlist_mut() {
-            pl.clips.retain(|c| {
-                let gone = ids.contains(&c.id);
-                if gone {
-                    gaps.push((track, c.range()));
-                }
-                !gone
-            });
+    let ids: HashSet<ClipId> = ids.iter().copied().collect();
+    let mut n = 0;
+    for track in s.tracks.iter().map(|t| t.id).collect::<Vec<_>>() {
+        if shuffle {
+            n += lift_all(s, track, &ids).len();
         }
-    }
-    let n = gaps.len();
-    if shuffle {
-        gaps.sort_by_key(|(t, r)| (t.0, std::cmp::Reverse(r.start)));
-        for (track, r) in gaps {
-            let moved = ripple(s, track, r.end, -r.len());
-            follow_automation(s, track, r.end, moved);
+        // Locked clips don't lift; they go without closing up, as everything does outside Shuffle.
+        if let Some(pl) = s.track_mut(track).and_then(|t| t.playlist_mut()) {
+            let before = pl.clips.len();
+            pl.clips.retain(|c| !ids.contains(&c.id));
+            n += before - pl.clips.len();
         }
     }
     n
