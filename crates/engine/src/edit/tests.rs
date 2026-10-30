@@ -160,6 +160,22 @@ fn clear_slip_and_shuffle() {
 }
 
 #[test]
+fn remove_clips_closes_each_gap_in_shuffle_only() {
+    let split = |shuffle| {
+        let (mut s, t) = session_with_clip();
+        separate_at(&mut s, t, 2000);
+        separate_at(&mut s, t, 3000);
+        separate_at(&mut s, t, 4000);
+        let ids: Vec<ClipId> = s.track(t).unwrap().clips().iter().map(|c| c.id).collect();
+        // The first and third pieces: [1000, 2000) and [3000, 4000).
+        assert_eq!(remove_clips(&mut s, &[ids[0], ids[2]], shuffle), 2);
+        clips(&s, t)
+    };
+    assert_eq!(split(false), vec![(2000, 1000, 2000), (4000, 1000, 4000)]);
+    assert_eq!(split(true), vec![(1000, 1000, 2000), (2000, 1000, 4000)]);
+}
+
+#[test]
 fn copy_paste_overwrites() {
     let (mut s, t) = session_with_clip();
     let copied = copy_range(&s, t, Range::new(1500, 2500));

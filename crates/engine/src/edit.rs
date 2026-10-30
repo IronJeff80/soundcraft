@@ -177,6 +177,33 @@ pub fn clear_range(s: &mut Session, track: TrackId, range: Range, shuffle: bool)
     removed
 }
 
+/// Remove the clips `ids` from every track. In Shuffle the later clips on each track close the gaps they leave,
+/// the latest gap first so the earlier ones stay where they were. Returns how many clips went.
+pub fn remove_clips(s: &mut Session, ids: &[ClipId], shuffle: bool) -> usize {
+    let mut gaps: Vec<(TrackId, Range)> = Vec::new();
+    for t in &mut s.tracks {
+        let track = t.id;
+        if let Some(pl) = t.playlist_mut() {
+            pl.clips.retain(|c| {
+                let gone = ids.contains(&c.id);
+                if gone {
+                    gaps.push((track, c.range()));
+                }
+                !gone
+            });
+        }
+    }
+    let n = gaps.len();
+    if shuffle {
+        gaps.sort_by_key(|(t, r)| (t.0, std::cmp::Reverse(r.start)));
+        for (track, r) in gaps {
+            let moved = ripple(s, track, r.end, -r.len());
+            follow_automation(s, track, r.end, moved);
+        }
+    }
+    n
+}
+
 /// Copy the material inside `range` (clips trimmed to the range), relative to `range.start`.
 pub fn copy_range(s: &Session, track: TrackId, range: Range) -> Vec<Clip> {
     let t = TimeCtx::of(s);
