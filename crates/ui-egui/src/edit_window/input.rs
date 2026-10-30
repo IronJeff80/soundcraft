@@ -533,15 +533,18 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>) {
         app.dialogs.open_rename_clip(c, &name);
     }
     if ui.button("Delete").clicked() {
-        let selected: Vec<u64> = app.engine.session().edit.selected_clips.iter().map(|id| id.0).collect();
+        let s = app.engine.session();
+        let selected: Vec<u64> = s.edit.selected_clips.iter().map(|id| id.0).collect();
+        let track: Vec<u64> = s.find_clip(c).map(|(t, _)| t.0).into_iter().collect();
         if !in_selection {
             let _ = app.run("edit.select", json!({"clips": [c.0]}));
             let _ = app.run("edit.clear", json!({}));
         } else if selected.is_empty() {
             let _ = app.run("edit.clear", json!({}));
         } else {
-            // Selected clips go by id (an empty range), so clips between them that the span covers stay.
-            let _ = app.run("edit.clear", json!({"clips": selected, "start": 0}));
+            // Selected clips go by id (an empty range), so clips between them that the span covers stay. The clicked
+            // clip's track satisfies Clear's track check even when the track selection was emptied meanwhile.
+            let _ = app.run("edit.clear", json!({"clips": selected, "tracks": track, "start": 0}));
         }
     }
 }

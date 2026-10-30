@@ -135,6 +135,26 @@ fn delete_on_selected_clips_keeps_the_unselected_clips_between_them() {
     assert_eq!(ids(&h, "Snare"), left, "only the selected Snare clip should be removed");
 }
 
+/// Selected clips are deleted even when the track selection was emptied after selecting them (Edit > Selection >
+/// Remove Edit from Top keeps the clip selection).
+#[test]
+fn delete_on_selected_clips_works_without_a_track_selection() {
+    let mut h = demo();
+    let kick = clip_count(&h, "Kick");
+    let clips: Vec<u64> = {
+        let s = h.state().engine.session();
+        s.tracks.iter().filter(|t| t.name == "Kick").flat_map(|t| t.clips()).map(|c| c.id.0).collect()
+    };
+    let e = &mut h.state_mut().engine;
+    e.execute("edit.select", &serde_json::json!({ "clips": clips })).unwrap();
+    e.execute("edit.remove_selection_top", &serde_json::json!({})).unwrap();
+    assert!(e.session().edit.selected_tracks.is_empty() && !e.session().edit.selected_clips.is_empty());
+
+    kick_menu(&mut h, "Delete");
+
+    assert_eq!(clip_count(&h, "Kick"), kick - clips.len(), "the selected Kick clips should be removed");
+}
+
 /// The menu's other entries act on the whole selection too.
 #[test]
 fn mute_on_a_selected_clip_mutes_every_selected_clip() {
