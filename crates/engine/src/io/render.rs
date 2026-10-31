@@ -250,6 +250,23 @@ mod name_tests {
         assert!((tempos[2].bpm - 100.0).abs() < 1e-3);
     }
 
+    /// A MIDI file replaces an existing session tempo event even if the MIDI file has consecutive equal tempos.
+    #[test]
+    fn midi_import_replaces_differing_existing_session_tempo() {
+        let note = soundcraft_midi::Note { pitch: 60, velocity: 100, release_velocity: 64, channel: 0, start: 0, length: 960 };
+        let sequence = soundcraft_midi::Sequence { notes: vec![note], ..Default::default() };
+        let smf = soundcraft_midi::Smf {
+            tracks: vec![soundcraft_midi::SmfTrack { name: String::new(), sequence }],
+            tempos: vec![(0, 120.0), (960, 120.0)],
+            ..Default::default()
+        };
+        let mut e = Engine::default();
+        e.session_mut().tempo.set_tempo(960, 80.0).unwrap();
+        assert_eq!(e.session().tempo.tempo_at_tick(960), 80.0);
+        import_midi_bytes(&mut e, &soundcraft_midi::write_smf(&smf).unwrap(), 0, true).unwrap();
+        assert_eq!(e.session().tempo.tempo_at_tick(960), 120.0);
+    }
+
     #[test]
     fn new_sources_take_the_first_free_file_name() {
         let mut s = Session::default();

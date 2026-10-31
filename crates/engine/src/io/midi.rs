@@ -25,13 +25,11 @@ pub fn import_midi_bytes(e: &mut Engine, bytes: &[u8], at: Samples, tempo_map: b
     }
     let s = e.session_mut();
     if tempo_map {
-        let mut last_bpm = None;
         for (tick, bpm) in &smf.tempos {
-            if last_bpm == Some(*bpm) {
+            if s.tempo.tempo_at_tick(*tick) == *bpm {
                 continue;
             }
             let _ = s.tempo.set_tempo(*tick, *bpm);
-            last_bpm = Some(*bpm);
         }
         for (tick, n, d) in &smf.meters {
             let _ = s.tempo.set_meter(*tick, u32::from(*n), u32::from(*d));
