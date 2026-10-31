@@ -115,11 +115,13 @@ fn tempo_constant(e: &mut Engine, p: &Value) -> Result<Value> {
     let r = range_param(e, id, p)?;
     let s = e.session();
     let (t0, t1) = (s.tempo.samples_to_ticks(r.start, s.sample_rate), s.tempo.samples_to_ticks(r.end, s.sample_rate));
-    if t1 <= t0 {
-        return tempo(e, p);
-    }
     let bpm = f64_or(p, "bpm", f64::NAN);
     let s = e.session_mut();
+    if t1 <= t0 {
+        // An empty range sets the tempo at its start, which may come from the selection.
+        s.tempo.set_tempo(t0, bpm).map_err(|err| bad(id, err.to_string()))?;
+        return Ok(json!({"tick": t0, "bpm": bpm}));
+    }
     // Read before the edit: the end is a musical position, and the new tempo moves it in samples.
     let after = s.tempo.tempo_at_tick(t1);
     let had_end = s.tempo.tempos().iter().any(|x| x.tick == t1);
@@ -426,6 +428,18 @@ fn step_marker(e: &mut Engine, dir: i64) -> Result<Value> {
 mod tests {
     use crate::demo::demo_engine;
     use serde_json::json;
+
+    #[test]
+    fn tempo_constant_with_an_empty_range_sets_the_tempo_at_its_start() {
+        use soundcraft_time::Range;
+        let mut e = demo_engine();
+        e.session_mut().edit.selection = Range::point(96_000);
+        let r = e.execute("event.tempo_constant", &json!({"bpm": 90.0, "end": 96_000})).unwrap();
+        let s = e.session();
+        let tick = s.tempo.samples_to_ticks(96_000, s.sample_rate);
+        assert_eq!(r["tick"], tick);
+        assert_eq!(s.tempo.tempo_at_tick(tick), 90.0);
+    }
 
     /// `start` is optional for insert/cut time: it defaults to the selection start, then `end`/`length` apply.
     #[test]
