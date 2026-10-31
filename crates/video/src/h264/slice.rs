@@ -467,13 +467,13 @@ impl PocState {
                 let max_lsb = 1i32 << sps.log2_max_poc_lsb;
                 let lsb = sh.pic_order_cnt_lsb as i32;
                 let msb = if lsb < prev_lsb && prev_lsb - lsb >= max_lsb / 2 {
-                    prev_msb + max_lsb
+                    prev_msb.saturating_add(max_lsb)
                 } else if lsb > prev_lsb && lsb - prev_lsb > max_lsb / 2 {
-                    prev_msb - max_lsb
+                    prev_msb.saturating_sub(max_lsb)
                 } else {
                     prev_msb
                 };
-                let top = msb + lsb;
+                let top = msb.saturating_add(lsb);
                 let bottom = top.saturating_add(sh.delta_pic_order_cnt_bottom);
                 Poc { top, bottom, msb, frame_num_offset: 0 }
             }
